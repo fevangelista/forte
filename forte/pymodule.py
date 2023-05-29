@@ -569,7 +569,8 @@ def run_forte(name, **kwargs):
     else:
         psi4.core.print_out('\n  Forte will use psi4 integrals')
         # Make an integral object from the psi4 wavefunction object
-        ints = forte.make_ints_from_psi4(ref_wfn, options, mo_space_info)
+        skip_build = (job_type == 'MCSCF_TWO_STEP' )
+        ints = forte.make_ints_from_psi4(ref_wfn, options, mo_space_info,options.get_str('INT_TYPE'),skip_build)
 
     start = time.time()
 
@@ -598,7 +599,17 @@ def run_forte(name, **kwargs):
         energy = casscf.compute_energy()
 
     if (job_type == "MCSCF_TWO_STEP"):
-        casscf = forte.make_mcscf_two_step(state_weights_map, scf_info, options, mo_space_info, ints)
+            # map state to number of roots
+        state_map = forte.to_state_nroots_map(state_weights_map)
+
+        # create an active space solver object and compute the energy
+        active_space_solver_type = options.get_str('ACTIVE_SPACE_SOLVER')
+        as_ints = forte.make_active_space_ints(mo_space_info, ints, "ACTIVE", ["RESTRICTED_DOCC"])
+        active_space_solver = forte.make_active_space_solver(
+            active_space_solver_type, state_map, scf_info, mo_space_info, as_ints, options
+        )
+        active_space_solver.compute_energy()
+        casscf = forte.make_mcscf_two_step(active_space_solver,state_weights_map, scf_info, options, mo_space_info, ints)
         energy = casscf.compute_energy()
     
     if (job_type == "TDCI"):
@@ -700,8 +711,9 @@ def gradient_forte(name, **kwargs):
     # Make an integral object
     time_pre_ints = time.time()
 
-    ints = forte.make_ints_from_psi4(ref_wfn, options, mo_space_info)
-
+    skip_build = (job_type == 'MCSCF_TWO_STEP' )
+    ints = forte.make_ints_from_psi4(ref_wfn, options, mo_space_info,options.get_str('INT_TYPE'),skip_build)
+    
     start = time.time()
 
     # Rotate orbitals before computation

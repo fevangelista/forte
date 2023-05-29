@@ -43,7 +43,8 @@ class DFIntegrals : public Psi4Integrals {
   public:
     /// Contructor of DFIntegrals
     DFIntegrals(std::shared_ptr<ForteOptions> options, std::shared_ptr<psi::Wavefunction> ref_wfn,
-                std::shared_ptr<MOSpaceInfo> mo_space_info, IntegralSpinRestriction restricted);
+                std::shared_ptr<MOSpaceInfo> mo_space_info, IntegralSpinRestriction restricted,
+                bool skip_build);
 
     void initialize() override;
 

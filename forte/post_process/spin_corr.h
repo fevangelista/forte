@@ -32,25 +32,27 @@
 #include <fstream>
 #include <iomanip>
 
-#include "base_classes/forte_options.h"
-#include "ci_rdm/ci_rdms.h"
-#include "integrals/active_space_integrals.h"
-#include "sparse_ci/determinant.h"
-#include "orbital-helpers/iao_builder.h"
-#include "orbital-helpers/localize.h"
+namespace psi {
+class Matrix;
+}
 
 namespace forte {
 
+class RDMs;
+class ForteOptions;
+class ActiveSpaceIntegrals;
+class MOSpaceInfo;
+
 /**
- * @brief The SpinCorr class
+ * @brief The SpinCorrelation class
  * This class computes the spin correlation from RDMs
  */
-class SpinCorr {
+class SpinCorrelation {
 
   public:
-    SpinCorr(std::shared_ptr<RDMs> rdms, std::shared_ptr<ForteOptions> options,
-             std::shared_ptr<MOSpaceInfo> mo_space_info,
-             std::shared_ptr<ActiveSpaceIntegrals> as_ints);
+    SpinCorrelation(std::shared_ptr<RDMs> rdms, std::shared_ptr<ForteOptions> options,
+                    std::shared_ptr<MOSpaceInfo> mo_space_info,
+                    std::shared_ptr<ActiveSpaceIntegrals> as_ints);
 
     std::pair<std::shared_ptr<psi::Matrix>, std::shared_ptr<psi::Matrix>> compute_nos();
 

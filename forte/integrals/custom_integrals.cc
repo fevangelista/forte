@@ -59,7 +59,7 @@ CustomIntegrals::CustomIntegrals(std::shared_ptr<ForteOptions> options,
                                  const std::vector<double>& tei_aa,
                                  const std::vector<double>& tei_ab,
                                  const std::vector<double>& tei_bb)
-    : ForteIntegrals(options, mo_space_info, Custom, restricted), full_aphys_tei_aa_(tei_aa),
+    : ForteIntegrals(options, mo_space_info, Custom, restricted, false), full_aphys_tei_aa_(tei_aa),
       full_aphys_tei_ab_(tei_ab), full_aphys_tei_bb_(tei_bb) {
     set_nuclear_repulsion(scalar);
     set_oei_all(oei_a, oei_b);

@@ -55,8 +55,8 @@ namespace forte {
 CholeskyIntegrals::CholeskyIntegrals(std::shared_ptr<ForteOptions> options,
                                      std::shared_ptr<psi::Wavefunction> ref_wfn,
                                      std::shared_ptr<MOSpaceInfo> mo_space_info,
-                                     IntegralSpinRestriction restricted)
-    : Psi4Integrals(options, ref_wfn, mo_space_info, Cholesky, restricted) {
+                                     IntegralSpinRestriction restricted, bool skip_build)
+    : Psi4Integrals(options, ref_wfn, mo_space_info, Cholesky, restricted, skip_build) {
     initialize();
 }
 

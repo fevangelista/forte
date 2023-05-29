@@ -53,13 +53,14 @@ using namespace ambit;
 
 namespace forte {
 
-MCSCF_2STEP::MCSCF_2STEP(const std::map<StateInfo, std::vector<double>>& state_weights_map,
+MCSCF_2STEP::MCSCF_2STEP(std::shared_ptr<ActiveSpaceSolver> as_solver,
+                         const std::map<StateInfo, std::vector<double>>& state_weights_map,
                          std::shared_ptr<ForteOptions> options,
                          std::shared_ptr<MOSpaceInfo> mo_space_info,
                          std::shared_ptr<forte::SCFInfo> scf_info,
                          std::shared_ptr<ForteIntegrals> ints)
-    : state_weights_map_(state_weights_map), options_(options), mo_space_info_(mo_space_info),
-      scf_info_(scf_info), ints_(ints) {
+    : as_solver_(as_solver), state_weights_map_(state_weights_map), options_(options),
+      mo_space_info_(mo_space_info), scf_info_(scf_info), ints_(ints) {
     startup();
 }
 
@@ -541,11 +542,13 @@ void MCSCF_2STEP::print_macro_iteration(const std::vector<CASSCF_HISTORY>& histo
 }
 
 std::unique_ptr<MCSCF_2STEP>
-make_mcscf_two_step(const std::map<StateInfo, std::vector<double>>& state_weight_map,
+make_mcscf_two_step(std::shared_ptr<ActiveSpaceSolver> as_solver,
+                    const std::map<StateInfo, std::vector<double>>& state_weight_map,
                     std::shared_ptr<SCFInfo> scf_info, std::shared_ptr<ForteOptions> options,
                     std::shared_ptr<MOSpaceInfo> mo_space_info,
                     std::shared_ptr<ForteIntegrals> ints) {
-    return std::make_unique<MCSCF_2STEP>(state_weight_map, options, mo_space_info, scf_info, ints);
+    return std::make_unique<MCSCF_2STEP>(as_solver, state_weight_map, options, mo_space_info,
+                                         scf_info, ints);
 }
 
 } // namespace forte

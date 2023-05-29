@@ -33,6 +33,7 @@
 #include "psi4/libpsi4util/PsiOutStream.h"
 #include "psi4/libmints/wavefunction.h"
 #include "psi4/libmints/matrix.h"
+#include "psi4/libpsi4util/process.h"
 
 #include "helpers/blockedtensorfactory.h"
 #include "base_classes/forte_options.h"
@@ -67,18 +68,19 @@ std::map<IntegralType, std::string> int_type_label{
 ForteIntegrals::ForteIntegrals(std::shared_ptr<ForteOptions> options,
                                std::shared_ptr<psi::Wavefunction> ref_wfn,
                                std::shared_ptr<MOSpaceInfo> mo_space_info,
-                               IntegralType integral_type, IntegralSpinRestriction restricted)
+                               IntegralType integral_type, IntegralSpinRestriction restricted,
+                               bool skip_build)
     : options_(options), mo_space_info_(mo_space_info), wfn_(ref_wfn),
-      integral_type_(integral_type), spin_restriction_(restricted), frozen_core_energy_(0.0),
-      scalar_energy_(0.0) {
+      integral_type_(integral_type), spin_restriction_(restricted), skip_build_(skip_build) {
     common_initialize();
 }
 
 ForteIntegrals::ForteIntegrals(std::shared_ptr<ForteOptions> options,
                                std::shared_ptr<MOSpaceInfo> mo_space_info,
-                               IntegralType integral_type, IntegralSpinRestriction restricted)
+                               IntegralType integral_type, IntegralSpinRestriction restricted,
+                               bool skip_build)
     : options_(options), mo_space_info_(mo_space_info), integral_type_(integral_type),
-      spin_restriction_(restricted) {
+      spin_restriction_(restricted), skip_build_(skip_build) {
     common_initialize();
 }
 
@@ -119,10 +121,6 @@ void ForteIntegrals::read_information() {
     num_tei_ = INDEX4(nmo_ - 1, nmo_ - 1, nmo_ - 1, nmo_ - 1) + 1;
     num_aptei_ = nmo_ * nmo_ * nmo_ * nmo_;
     num_threads_ = omp_get_max_threads();
-
-    // skip integral allocation and transformation if doing CASSCF
-    auto job_type = options_->get_str("JOB_TYPE");
-    skip_build_ = (job_type == "MCSCF_TWO_STEP") and (integral_type_ != Custom);
 }
 
 void ForteIntegrals::allocate() {
@@ -164,6 +162,8 @@ void ForteIntegrals::jk_finalize() {
             JK_status_ = JKStatus::finalized;
     }
 }
+
+bool ForteIntegrals::skip_build() const { return skip_build_; }
 
 size_t ForteIntegrals::nso() const { return nso_; }
 
@@ -544,5 +544,407 @@ void ForteIntegrals::_undefined_function(const std::string& method) const {
     throw std::runtime_error("ForteIntegrals::" + method + " not supported for integral type " +
                              std::to_string(integral_type()));
 }
+
+// void ForteIntegral::build_fock(bool rebuild_inactive) {
+//     if (rebuild_inactive) {
+//         build_fock_inactive();
+//     }
+
+//     build_fock_active();
+
+//     Fock_->add(F_closed_);
+//     Fock_->set_name("Fock_MO");
+
+//     format_fock(Fock_, F_);
+
+//     // fill in diagonal Fock in Pitzer ordering
+//     for (const std::string& space : {"c", "a", "v"}) {
+//         std::string block = space + space;
+//         auto mos = label_to_mos_[space];
+//         for (size_t i = 0, size = mos.size(); i < size; ++i) {
+//             Fd_[mos[i]] = F_.block(block).data()[i * size + i];
+//         }
+//     }
+
+//     if (debug_print_) {
+//         Fock_->print();
+//     }
+// }
+
+// void ForteIntegral::build_fock_active() {
+//     // Implementation Notes (in AO basis)
+//     // F_active = D_{uv}^{active} * ( (uv|rs) - 0.5 * (us|rv) )
+//     // D_{uv}^{active} = \sum_{xy}^{active} C_{ux} * C_{vy} * Gamma1_{xy}
+
+//     Fock_ = ints_->make_fock_active_restricted(rdm1_);
+//     Fock_->set_name("Fock_active");
+
+//     if (debug_print_) {
+//         Fock_->print();
+//     }
+// }
+
+// void ForteIntegral::build_fock_inactive() {
+//     /* F_inactive = Hcore + F_frozen + F_restricted
+//      *
+//      * F_frozen = D_{uv}^{frozen} * (2 * (uv|rs) - (us|rv))
+//      * D_{uv}^{frozen} = \sum_{i}^{frozen} C_{ui} * C_{vi}
+//      *
+//      * F_restricted = D_{uv}^{restricted} * (2 * (uv|rs) - (us|rv))
+//      * D_{uv}^{restricted} = \sum_{i}^{restricted} C_{ui} * C_{vi}
+//      *
+//      * u,v,r,s: AO indices; i: MO indices
+//      */
+
+//     auto Ftuple = ints_->make_fock_inactive(psi::Dimension(nirrep_), ndoccpi_);
+//     std::tie(F_closed_, std::ignore, e_closed_) = Ftuple;
+//     F_closed_->set_name("Fock_inactive");
+
+//     // put into Ambit BlockedTensor format
+//     format_fock(F_closed_, Fc_);
+
+//     if (debug_print_) {
+//         F_closed_->print();
+//         outfile->Printf("\n  Frozen-core energy   %20.15f", ints_->frozen_core_energy());
+//         outfile->Printf("\n  Closed-shell energy  %20.15f", e_closed_);
+//     }
+// }
+
+/// This function replaces the function void CASSCF_ORB_GRAD::build_tei_from_ao() in
+/// casscf_orb_grad.cc It uses the JK object stored in the ForteIntegral class and takes as
+/// parameters the quantities that are defined locally in the CASSCF_ORB_GRAD class.
+// actv_mos_ = mo_space_info_->absolute_mo("ACTIVE");
+std::tuple<ambit::Tensor, ambit::Tensor, double>
+ForteIntegrals::build_active_ints_from_jk(std::shared_ptr<psi::Matrix> C) {
+    size_t nactv = mo_space_info_->size("ACTIVE");
+    auto actv_ab = ambit::Tensor::build(CoreTensor, "tei_actv_aa", std::vector<size_t>(4, nactv));
+    auto fock_a = ambit::Tensor::build(CoreTensor, "fock_actv_aa", std::vector<size_t>(2, nactv));
+    if (nactv == 0)
+        return std::make_tuple(actv_ab, fock_a, 0.0);
+
+    // This function will do an integral transformation using the JK builder,
+    // and return the integrals of type <px|uy> = (pu|xy).
+    timer_on("Build (pu|xy) integrals");
+
+    auto core_mos_ = mo_space_info_->absolute_mo("RESTRICTED_DOCC");
+    auto actv_mos_ = mo_space_info_->absolute_mo("ACTIVE");
+
+    std::map<std::string, std::vector<size_t>> label_to_mos_;
+    label_to_mos_["f"] = mo_space_info_->absolute_mo("FROZEN_DOCC");
+    label_to_mos_["c"] = core_mos_;
+    label_to_mos_["a"] = actv_mos_;
+    label_to_mos_["v"] = mo_space_info_->absolute_mo("RESTRICTED_UOCC");
+    label_to_mos_["u"] = mo_space_info_->absolute_mo("FROZEN_UOCC");
+
+    auto ndoccpi_ = mo_space_info_->dimension("INACTIVE_DOCC");
+
+    /// Relative indices within an irrep <irrep, relative indices>
+    std::vector<std::pair<int, size_t>> mos_rel_;
+
+    /// Relative indices within an MO space <space, relative indices>
+    std::vector<std::pair<std::string, size_t>> mos_rel_space_;
+
+    // in Pitzer ordering
+    mos_rel_space_.resize(nmo_);
+    for (const std::string& space : {"f", "c", "a", "v", "u"}) {
+        const auto& mos = label_to_mos_[space];
+        for (size_t p = 0, size = mos.size(); p < size; ++p) {
+            mos_rel_space_[mos[p]] = std::make_pair(space, p);
+        }
+    }
+
+    // in Pitzer ordering
+    mos_rel_.resize(nmo_);
+    for (int h = 0, offset = 0; h < nirrep_; ++h) {
+        for (int i = 0; i < nmopi_[h]; ++i) {
+            mos_rel_[i + offset] = std::make_pair(h, i);
+        }
+        offset += nmopi_[h];
+    }
+
+    // Transform C matrix to C1 symmetry
+    // JK does not support mixed symmetry needed for 4-index integrals (York 09/09/2020)
+    auto aotoso = wfn()->aotoso();
+    auto C_nosym = std::make_shared<psi::Matrix>(nso_, nmo_);
+
+    // Transform from the SO to the AO basis for the C matrix
+    // MO in Pitzer ordering and only keep the non-frozen MOs
+    for (int h = 0, index = 0; h < nirrep_; ++h) {
+        for (int i = 0; i < nmopi_[h]; ++i) {
+            size_t nao = nso_, nso_h = nsopi_[h];
+
+            if (!nso_h)
+                continue;
+
+            C_DGEMV('N', nao, nso_h, 1.0, aotoso->pointer(h)[0], nso_h, &C->pointer(h)[0][i],
+                    nmopi_[h], 0.0, &C_nosym->pointer()[0][index], nmo_);
+
+            index += 1;
+        }
+    }
+    // set up the active part of the C matrix
+    auto Cact = std::make_shared<psi::Matrix>("Cact", nso_, nactv);
+    std::vector<std::shared_ptr<psi::Matrix>> Cact_vec(nactv);
+
+    for (size_t x = 0; x < nactv; ++x) {
+        auto Ca_nosym_vec = C_nosym->get_column(0, actv_mos_[x]);
+        Cact->set_column(0, x, Ca_nosym_vec);
+
+        std::string name = "Cact slice " + std::to_string(x);
+        auto temp = std::make_shared<psi::Matrix>(name, nso_, 1);
+        temp->set_column(0, 0, Ca_nosym_vec);
+        Cact_vec[x] = temp;
+    }
+
+    // The following type of integrals are needed:
+    // (pu|xy) = C_{Mp}^T C_{Nu} C_{Rx}^T C_{Sy} (MN|RS)
+    //         = C_{Mp}^T C_{Nu} J_{MN}^{xy}
+    //         = C_{Mp}^T J_{MN}^{xy} C_{Nu}
+
+    JK_->set_do_K(false);
+    std::vector<std::shared_ptr<psi::Matrix>>& Cl = JK_->C_left();
+    std::vector<std::shared_ptr<psi::Matrix>>& Cr = JK_->C_right();
+    Cl.clear();
+    Cr.clear();
+
+    // figure out memory bottleneck
+    size_t mem_sys = psi::Process::environment.get_memory() * 0.85;
+    size_t max_elements = nactv * nactv * nso_ * nso_ * sizeof(double);
+    size_t n_buckets = max_elements / mem_sys + (max_elements % mem_sys ? 1 : 0);
+
+    size_t n_pairs = nactv * (nactv + 1) / 2;
+    size_t n_pairspb = n_pairs / n_buckets;
+    size_t n_mod = n_pairs - n_buckets * n_pairspb;
+
+    // throw for JK's strange "same" test in compute_D() of jk.cc (York 09/09/2020)
+    if (n_pairspb == 1 and nirrep_ != 1) {
+        outfile->Printf("\n  Error: Problem for JK in compute_D() in this case");
+        outfile->Printf("\n  If there is 1 active orbitals, try RHF/ROHF of Psi4.");
+        outfile->Printf("\n  If not, try to increase the memory or compute in C1 symmetry.");
+        throw std::runtime_error("JK does not work in this case. Try C1 symmetry.");
+    }
+
+    // put all (x,y) pairs to a vector for easy splittig to buckets
+    std::vector<std::tuple<int, int>> pairs;
+    pairs.reserve(nactv * (nactv + 1) / 2);
+    for (size_t x = 0; x < nactv; ++x) {
+        for (size_t y = x; y < nactv; ++y) {
+            pairs.emplace_back(x, y);
+        }
+    }
+
+    // set up ambit spaces
+    BlockedTensor::reset_mo_spaces();
+    BlockedTensor::set_expert_mode(true);
+
+    BlockedTensor::add_mo_space("f", "I,J", label_to_mos_["f"], NoSpin);
+    BlockedTensor::add_mo_space("c", "i,j", core_mos_, NoSpin);
+    BlockedTensor::add_mo_space("a", "t,u,v,w,y,x,z", actv_mos_, NoSpin);
+    BlockedTensor::add_mo_space("v", "a,b", label_to_mos_["v"], NoSpin);
+    BlockedTensor::add_mo_space("u", "A,B", label_to_mos_["u"], NoSpin);
+
+    BlockedTensor::add_composite_mo_space("F", "M,N", {"f", "u"});
+    BlockedTensor::add_composite_mo_space("g", "p,q,r,s", {"c", "a", "v"});
+    BlockedTensor::add_composite_mo_space("G", "P,Q,R,S", {"f", "c", "a", "v", "u"});
+
+    auto V_ = ambit::BlockedTensor::build(ambit::CoreTensor, "V", {"Gaaa"});
+
+    // JK compute
+    size_t nactv2 = nactv * nactv;
+    size_t nactv3 = nactv2 * nactv;
+    for (size_t N = 0, offset = 0; N < n_buckets; ++N) {
+        size_t n_pairs = N < n_mod ? n_pairspb + 1 : n_pairspb;
+
+        Cl.clear();
+        Cr.clear();
+
+        for (size_t i = 0; i < n_pairs; ++i) {
+            Cl.push_back(Cact_vec[std::get<0>(pairs[i + offset])]);
+            Cr.push_back(Cact_vec[std::get<1>(pairs[i + offset])]);
+        }
+        JK_->compute();
+
+        // transform to MO and fill V_
+        for (size_t i = 0; i < n_pairs; ++i) {
+            auto x = std::get<0>(pairs[i + offset]);
+            auto y = std::get<1>(pairs[i + offset]);
+
+            auto half_trans = psi::linalg::triplet(C_nosym, JK_->J()[i], Cact, true, false, false);
+
+            for (size_t p = 0; p < nmo_; ++p) {
+                size_t np = mos_rel_space_[p].second;
+
+                std::string block = mos_rel_space_[p].first + "aaa";
+                auto& data = V_.block(block).data();
+
+                for (size_t u = 0; u < nactv; ++u) {
+                    double value = half_trans->get(p, u);
+                    data[np * nactv3 + u * nactv2 + x * nactv + y] = value;
+                    data[np * nactv3 + u * nactv2 + y * nactv + x] = value;
+                }
+            }
+        }
+
+        offset += n_pairs;
+    }
+
+    timer_off("Build (pu|xy) integrals");
+
+    actv_ab("pqrs") = V_.block("aaaa")("prqs");
+
+    auto Ftuple = make_fock_inactive(psi::Dimension(nirrep_), ndoccpi_);
+    std::shared_ptr<psi::Matrix> F_closed_; // nmo x nmo
+
+    double e_closed;
+    std::tie(F_closed_, std::ignore, e_closed) = Ftuple;
+    F_closed_->set_name("Fock_inactive");
+
+    // put into Ambit BlockedTensor format
+    auto Fc_ = ambit::BlockedTensor::build(ambit::CoreTensor, "Fc", {"GG"});
+
+    Fc_.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
+        auto irrep_index_pair1 = mos_rel_[i[0]];
+        auto irrep_index_pair2 = mos_rel_[i[1]];
+
+        int h1 = irrep_index_pair1.first;
+
+        if (h1 == irrep_index_pair2.first) {
+            auto p = irrep_index_pair1.second;
+            auto q = irrep_index_pair2.second;
+            value = F_closed_->get(h1, p, q);
+        } else {
+            value = 0.0;
+        }
+    });
+
+    fock_a("uv") = Fc_.block("aa")("uv");
+
+    // format_fock(F_closed_, Fc_);
+
+    return std::make_tuple(actv_ab, Fc_.block("aa"), e_closed);
+}
+
+// void ForteIntegral::build_active_tei_from_jk(size_t nactv) {
+//     if (nactv == 0)
+//         return;
+
+//     // This function will do an integral transformation using the JK builder,
+//     // and return the integrals of type <px|uy> = (pu|xy).
+//     // timer_on("Build (pu|xy) integrals");
+
+//     // Transform C matrix to C1 symmetry
+//     // JK does not support mixed symmetry needed for 4-index integrals (York 09/09/2020)
+//     auto aotoso = wfn()->aotoso();
+//     auto C_nosym = std::make_shared<psi::Matrix>(nso_, nmo_);
+
+//     // Transform from the SO to the AO basis for the C matrix
+//     // MO in Pitzer ordering and only keep the non-frozen MOs
+//     for (int h = 0, index = 0; h < nirrep_; ++h) {
+//         for (int i = 0; i < nmopi_[h]; ++i) {
+//             int nao = nso_, nso_h = nsopi_[h];
+
+//             if (!nso_h)
+//                 continue;
+
+//             C_DGEMV('N', nao, nso_h, 1.0, aotoso->pointer(h)[0], nso_h, &C_->pointer(h)[0][i],
+//                     nmopi_[h], 0.0, &C_nosym->pointer()[0][index], nmo_);
+
+//             index += 1;
+//         }
+//     }
+
+//     // set up the active part of the C matrix
+//     auto Cact = std::make_shared<psi::Matrix>("Cact", nso_, nactv);
+//     std::vector<std::shared_ptr<psi::Matrix>> Cact_vec(nactv);
+
+//     for (size_t x = 0; x < nactv; ++x) {
+//         auto Ca_nosym_vec = C_nosym->get_column(0, actv_mos_[x]);
+//         Cact->set_column(0, x, Ca_nosym_vec);
+
+//         std::string name = "Cact slice " + std::to_string(x);
+//         auto temp = std::make_shared<psi::Matrix>(name, nso_, 1);
+//         temp->set_column(0, 0, Ca_nosym_vec);
+//         Cact_vec[x] = temp;
+//     }
+
+//     // The following type of integrals are needed:
+//     // (pu|xy) = C_{Mp}^T C_{Nu} C_{Rx}^T C_{Sy} (MN|RS)
+//     //         = C_{Mp}^T C_{Nu} J_{MN}^{xy}
+//     //         = C_{Mp}^T J_{MN}^{xy} C_{Nu}
+
+//     JK_->set_do_K(false);
+//     std::vector<std::shared_ptr<psi::Matrix>>& Cl = JK_->C_left();
+//     std::vector<std::shared_ptr<psi::Matrix>>& Cr = JK_->C_right();
+//     Cl.clear();
+//     Cr.clear();
+
+//     // figure out memory bottleneck
+//     size_t mem_sys = psi::Process::environment.get_memory() * 0.85;
+//     size_t max_elements = nactv * nactv * nso_ * nso_ * sizeof(double);
+//     size_t n_buckets = max_elements / mem_sys + (max_elements % mem_sys ? 1 : 0);
+
+//     size_t n_pairs = nactv * (nactv + 1) / 2;
+//     size_t n_pairspb = n_pairs / n_buckets;
+//     size_t n_mod = n_pairs - n_buckets * n_pairspb;
+
+//     // throw for JK's strange "same" test in compute_D() of jk.cc (York 09/09/2020)
+//     if (n_pairspb == 1 and nirrep_ != 1) {
+//         outfile->Printf("\n  Error: Problem for JK in compute_D() in this case");
+//         outfile->Printf("\n  If there is 1 active orbitals, try RHF/ROHF of Psi4.");
+//         outfile->Printf("\n  If not, try to increase the memory or compute in C1 symmetry.");
+//         throw std::runtime_error("JK does not work in this case. Try C1 symmetry.");
+//     }
+
+//     // put all (x,y) pairs to a vector for easy splittig to buckets
+//     std::vector<std::tuple<int, int>> pairs;
+//     pairs.reserve(nactv * (nactv + 1) / 2);
+//     for (size_t x = 0; x < nactv; ++x) {
+//         for (size_t y = x; y < nactv; ++y) {
+//             pairs.emplace_back(x, y);
+//         }
+//     }
+
+//     // JK compute
+//     size_t nactv2 = nactv * nactv;
+//     size_t nactv3 = nactv2 * nactv;
+//     for (size_t N = 0, offset = 0; N < n_buckets; ++N) {
+//         size_t n_pairs = N < n_mod ? n_pairspb + 1 : n_pairspb;
+
+//         Cl.clear();
+//         Cr.clear();
+
+//         for (size_t i = 0; i < n_pairs; ++i) {
+//             Cl.push_back(Cact_vec[std::get<0>(pairs[i + offset])]);
+//             Cr.push_back(Cact_vec[std::get<1>(pairs[i + offset])]);
+//         }
+//         JK_->compute();
+
+//         // transform to MO and fill V_
+//         for (size_t i = 0; i < n_pairs; ++i) {
+//             auto x = std::get<0>(pairs[i + offset]);
+//             auto y = std::get<1>(pairs[i + offset]);
+
+//             auto half_trans = psi::linalg::triplet(C_nosym, JK_->J()[i], Cact, true, false,
+//             false);
+
+//             for (size_t p = 0; p < nmo_; ++p) {
+//                 size_t np = mos_rel_space_[p].second;
+
+//                 std::string block = mos_rel_space_[p].first + "aaa";
+//                 auto& data = V_.block(block).data();
+
+//                 for (size_t u = 0; u < nactv; ++u) {
+//                     double value = half_trans->get(p, u);
+//                     data[np * nactv3 + u * nactv2 + x * nactv + y] = value;
+//                     data[np * nactv3 + u * nactv2 + y * nactv + x] = value;
+//                 }
+//             }
+//         }
+
+//         offset += n_pairs;
+//     }
+
+//     timer_off("Build (pu|xy) integrals");
+// }
 
 } // namespace forte

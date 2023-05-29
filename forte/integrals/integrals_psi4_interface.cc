@@ -64,8 +64,8 @@ namespace forte {
 Psi4Integrals::Psi4Integrals(std::shared_ptr<ForteOptions> options,
                              std::shared_ptr<psi::Wavefunction> ref_wfn,
                              std::shared_ptr<MOSpaceInfo> mo_space_info, IntegralType integral_type,
-                             IntegralSpinRestriction restricted)
-    : ForteIntegrals(options, ref_wfn, mo_space_info, integral_type, restricted) {
+                             IntegralSpinRestriction restricted, bool skip_build)
+    : ForteIntegrals(options, ref_wfn, mo_space_info, integral_type, restricted, skip_build) {
     base_initialize_psi4();
 }
 
@@ -196,7 +196,7 @@ void Psi4Integrals::make_psi4_JK() {
             JK_ = JK::build_JK(basis, basis_aux, psi4_options, "MEM_DF");
         }
     } else {
-        throw psi::PSIEXCEPTION("Unknown Pis4 integral type to initialize JK in Forte");
+        throw psi::PSIEXCEPTION("Unknown Psi4 integral type to initialize JK in Forte");
     }
 
     JK_->set_cutoff(schwarz_cutoff_);

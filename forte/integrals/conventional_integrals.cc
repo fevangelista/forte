@@ -53,8 +53,8 @@ namespace forte {
 ConventionalIntegrals::ConventionalIntegrals(std::shared_ptr<ForteOptions> options,
                                              std::shared_ptr<psi::Wavefunction> ref_wfn,
                                              std::shared_ptr<MOSpaceInfo> mo_space_info,
-                                             IntegralSpinRestriction restricted)
-    : Psi4Integrals(options, ref_wfn, mo_space_info, Conventional, restricted) {
+                                             IntegralSpinRestriction restricted, bool skip_build)
+    : Psi4Integrals(options, ref_wfn, mo_space_info, Conventional, restricted, skip_build) {
     initialize();
 }
 

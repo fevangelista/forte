@@ -117,7 +117,7 @@ class ForteIntegrals {
     ForteIntegrals(std::shared_ptr<ForteOptions> options,
                    std::shared_ptr<psi::Wavefunction> ref_wfn,
                    std::shared_ptr<MOSpaceInfo> mo_space_info, IntegralType integral_type,
-                   IntegralSpinRestriction restricted);
+                   IntegralSpinRestriction restricted, bool skip_build);
 
     /**
      * @brief Class constructor
@@ -127,7 +127,7 @@ class ForteIntegrals {
      */
     ForteIntegrals(std::shared_ptr<ForteOptions> options,
                    std::shared_ptr<MOSpaceInfo> mo_space_info, IntegralType integral_type,
-                   IntegralSpinRestriction restricted);
+                   IntegralSpinRestriction restricted, bool skip_build);
 
     /// Virtual destructor to enable deletion of a Derived* through a Base*
     virtual ~ForteIntegrals() = default;
@@ -139,8 +139,7 @@ class ForteIntegrals {
 
     virtual void initialize() = 0;
 
-    /// Skip integral transformation
-    bool skip_build_;
+    bool skip_build() const;
 
     /// Return Ca
     std::shared_ptr<psi::Matrix> Ca() const;
@@ -153,10 +152,10 @@ class ForteIntegrals {
     /// temporary solution for not having a Wavefunction
     std::shared_ptr<psi::Wavefunction> wfn();
 
-    /// Return the Pis4 JK object
+    /// Return the Psi4 JK object
     std::shared_ptr<psi::JK> jk();
 
-    /// Enum class for the status of Pis4 JK
+    /// Enum class for the status of Psi4 JK
     enum class JKStatus { empty, initialized, finalized };
     /// Return the status of Psi4 JK object
     JKStatus jk_status();
@@ -255,6 +254,8 @@ class ForteIntegrals {
     virtual ambit::Tensor aptei_bb_block(const std::vector<size_t>& p, const std::vector<size_t>& q,
                                          const std::vector<size_t>& r,
                                          const std::vector<size_t>& s) = 0;
+
+    // void build_active_tei_from_jk(size_t nactv);
 
     // Three-index integral functions (DF, Cholesky)
     virtual ambit::Tensor three_integral_block(const std::vector<size_t>&,
@@ -371,6 +372,9 @@ class ForteIntegrals {
     /// Return the one-body AO integrals
     std::shared_ptr<psi::Matrix> OneBodyAO() const;
 
+    std::tuple<ambit::Tensor, ambit::Tensor, double>
+    build_active_ints_from_jk(std::shared_ptr<psi::Matrix> C);
+
     virtual int ga_handle();
 
     /// Print the details of the integral transformation
@@ -448,6 +452,9 @@ class ForteIntegrals {
     /// The number of correlated MOs per irrep (non frozen).  This is nmopi -
     /// nfzcpi - nfzvpi.
     psi::Dimension ncmopi_;
+
+    /// Skip building the two-electron integrals?
+    bool skip_build_;
 
     /// The number of orbitals used in indexing routines (nmo or ncmo if core orbitals are
     /// frozen) The correct value is set by the integrals class
@@ -570,7 +577,7 @@ class Psi4Integrals : public ForteIntegrals {
   public:
     Psi4Integrals(std::shared_ptr<ForteOptions> options, std::shared_ptr<psi::Wavefunction> ref_wfn,
                   std::shared_ptr<MOSpaceInfo> mo_space_info, IntegralType integral_type,
-                  IntegralSpinRestriction restricted);
+                  IntegralSpinRestriction restricted, bool skip_build);
 
     /// Make the generalized Fock matrix using Psi4 JK object
     void make_fock_matrix(ambit::Tensor Da, ambit::Tensor Db) override;

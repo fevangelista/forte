@@ -43,11 +43,12 @@
 
 namespace forte {
 
-std::shared_ptr<ForteIntegrals>
-make_forte_integrals_from_psi4(std::shared_ptr<psi::Wavefunction> ref_wfn,
-                               std::shared_ptr<ForteOptions> options,
-                               std::shared_ptr<MOSpaceInfo> mo_space_info, std::string int_type) {
+std::shared_ptr<ForteIntegrals> make_forte_integrals_from_psi4(
+    std::shared_ptr<psi::Wavefunction> ref_wfn, std::shared_ptr<ForteOptions> options,
+    std::shared_ptr<MOSpaceInfo> mo_space_info, std::string int_type, bool skip_build) {
+
     timer int_timer("Integrals");
+
     std::shared_ptr<ForteIntegrals> ints;
     // passing int_type overrides the value of the option INT_TYPE
     if (int_type != "") {
@@ -55,18 +56,19 @@ make_forte_integrals_from_psi4(std::shared_ptr<psi::Wavefunction> ref_wfn,
     } else {
         int_type = options->get_str("INT_TYPE");
     }
+
     if (int_type == "CHOLESKY") {
         ints = std::make_shared<CholeskyIntegrals>(options, ref_wfn, mo_space_info,
-                                                   IntegralSpinRestriction::Restricted);
+                                                   IntegralSpinRestriction::Restricted, skip_build);
     } else if (int_type == "DF") {
         ints = std::make_shared<DFIntegrals>(options, ref_wfn, mo_space_info,
-                                             IntegralSpinRestriction::Restricted);
+                                             IntegralSpinRestriction::Restricted, skip_build);
     } else if (int_type == "DISKDF") {
         ints = std::make_shared<DISKDFIntegrals>(options, ref_wfn, mo_space_info,
-                                                 IntegralSpinRestriction::Restricted);
+                                                 IntegralSpinRestriction::Restricted, skip_build);
     } else if (int_type == "CONVENTIONAL") {
-        ints = std::make_shared<ConventionalIntegrals>(options, ref_wfn, mo_space_info,
-                                                       IntegralSpinRestriction::Restricted);
+        ints = std::make_shared<ConventionalIntegrals>(
+            options, ref_wfn, mo_space_info, IntegralSpinRestriction::Restricted, skip_build);
     } else if (int_type == "DISTDF") {
 #ifdef HAVE_GA
         ints = std::make_shared<DistDFIntegrals>(options, ref_wfn, mo_space_info,
@@ -74,7 +76,7 @@ make_forte_integrals_from_psi4(std::shared_ptr<psi::Wavefunction> ref_wfn,
 #endif
     } else {
         psi::outfile->Printf("\n Please check your int_type. Choices are CHOLESKY, DF, DISKDF , "
-                             "DISTRIBUTEDDF, or CONVENTIONAL");
+                             "DISTDF, or CONVENTIONAL");
         throw std::runtime_error("INT_TYPE is not correct.  Check options");
     }
 

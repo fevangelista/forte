@@ -40,7 +40,7 @@ namespace forte {
  */
 std::shared_ptr<ForteIntegrals> make_forte_integrals_from_psi4(
     std::shared_ptr<psi::Wavefunction> ref_wfn, std::shared_ptr<ForteOptions> options,
-    std::shared_ptr<MOSpaceInfo> mo_space_info, std::string int_type = "");
+    std::shared_ptr<MOSpaceInfo> mo_space_info, std::string int_type, bool skip_build);
 
 /**
  *  @brief Make a ForteIntegrals object by passing integrals stored in vectors

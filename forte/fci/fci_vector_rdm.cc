@@ -41,7 +41,6 @@
 
 #include "fci_vector.h"
 #include "fci_solver.h"
-#include "binary_graph.hpp"
 #include "string_lists.h"
 #include "string_address.h"
 

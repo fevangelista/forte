@@ -143,6 +143,9 @@ class ActiveSpaceIntegrals {
     /// Set the active integrals
     void set_active_integrals(const ambit::Tensor& tei_aa, const ambit::Tensor& tei_ab,
                               const ambit::Tensor& tei_bb);
+    /// Build the active integrals from the integrals object stored in this class
+    void build_active_integrals_from_ints();
+
     /// Compute the restricted_docc operator
     void compute_restricted_one_body_operator();
     /// Set the restricted_one_body_operator

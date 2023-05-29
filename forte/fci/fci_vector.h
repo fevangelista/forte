@@ -43,7 +43,6 @@ class Vector;
 
 namespace forte {
 class ActiveSpaceIntegrals;
-class BinaryGraph;
 class MOSpaceInfo;
 class StringLists;
 class StringAddress;

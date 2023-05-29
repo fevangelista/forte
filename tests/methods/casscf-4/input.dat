@@ -23,6 +23,7 @@ set forte{
    job_type             mcscf_two_step
    restricted_docc      [2,0,0,0]
    active               [1,0,0,1]
+   active_space_solver  fci
    int_type             conventional
    cholesky_tolerance   1e-10
    print                0

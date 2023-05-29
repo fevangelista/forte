@@ -45,7 +45,8 @@ class DISKDFIntegrals : public Psi4Integrals {
     /// Contructor of DISKDFIntegrals
     DISKDFIntegrals(std::shared_ptr<ForteOptions> options,
                     std::shared_ptr<psi::Wavefunction> ref_wfn,
-                    std::shared_ptr<MOSpaceInfo> mo_space_info, IntegralSpinRestriction restricted);
+                    std::shared_ptr<MOSpaceInfo> mo_space_info, IntegralSpinRestriction restricted,
+                    bool skip_build);
 
     void initialize() override;
     /// aptei_xy functions are slow.  try to use three_integral_block

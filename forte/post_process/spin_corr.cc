@@ -34,15 +34,21 @@
 #include "base_classes/forte_options.h"
 #include "helpers/printing.h"
 #include "helpers/helpers.h"
+
+#include "base_classes/mo_space_info.h"
+#include "base_classes/rdms.h"
+#include "integrals/active_space_integrals.h"
+#include "orbital-helpers/localize.h"
+
 #include "post_process/spin_corr.h"
 
 using namespace psi;
 
 namespace forte {
 
-SpinCorr::SpinCorr(std::shared_ptr<RDMs> rdms, std::shared_ptr<ForteOptions> options,
-                   std::shared_ptr<MOSpaceInfo> mo_space_info,
-                   std::shared_ptr<ActiveSpaceIntegrals> as_ints)
+SpinCorrelation::SpinCorrelation(std::shared_ptr<RDMs> rdms, std::shared_ptr<ForteOptions> options,
+                                 std::shared_ptr<MOSpaceInfo> mo_space_info,
+                                 std::shared_ptr<ActiveSpaceIntegrals> as_ints)
     : rdms_(rdms), options_(options), mo_space_info_(mo_space_info), as_ints_(as_ints) {
 
     nactpi_ = mo_space_info_->dimension("ACTIVE");
@@ -50,7 +56,8 @@ SpinCorr::SpinCorr(std::shared_ptr<RDMs> rdms, std::shared_ptr<ForteOptions> opt
     nact_ = nactpi_.sum();
 }
 
-std::pair<std::shared_ptr<psi::Matrix>, std::shared_ptr<psi::Matrix>> SpinCorr::compute_nos() {
+std::pair<std::shared_ptr<psi::Matrix>, std::shared_ptr<psi::Matrix>>
+SpinCorrelation::compute_nos() {
 
     print_h2("Natural Orbitals");
 
@@ -108,7 +115,7 @@ std::pair<std::shared_ptr<psi::Matrix>, std::shared_ptr<psi::Matrix>> SpinCorr::
     return std::make_pair(Ua, Ub);
 }
 
-void SpinCorr::spin_analysis() {
+void SpinCorrelation::spin_analysis() {
     size_t nact = static_cast<unsigned long>(nact_);
     size_t nact2 = nact * nact;
     size_t nact3 = nact * nact2;
@@ -366,7 +373,7 @@ void SpinCorr::spin_analysis() {
 void perform_spin_analysis(std::shared_ptr<RDMs> rdms, std::shared_ptr<ForteOptions> options,
                            std::shared_ptr<MOSpaceInfo> mo_space_info,
                            std::shared_ptr<ActiveSpaceIntegrals> as_ints) {
-    SpinCorr spin(rdms, options, mo_space_info, as_ints);
+    SpinCorrelation spin(rdms, options, mo_space_info, as_ints);
     spin.spin_analysis();
 }
 

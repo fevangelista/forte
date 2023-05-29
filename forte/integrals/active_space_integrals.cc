@@ -540,6 +540,45 @@ void ActiveSpaceIntegrals::print() {
     }
 }
 
+void ActiveSpaceIntegrals::build_active_integrals_from_ints() {
+    // grab the integrals from the ForteIntegrals object
+    if (ints_->spin_restriction() == IntegralSpinRestriction::Restricted) {
+        ambit::Tensor tei_active_ab;
+        if (not ints_->skip_build()) {
+            tei_active_ab =
+                ints_->aptei_ab_block(active_mo(), active_mo(), active_mo(), active_mo());
+            auto tei_active_aa = tei_active_ab.clone();
+            tei_active_aa("pqrs") = tei_active_ab("pqrs") - tei_active_ab("pqsr");
+            tei_active_aa.set_name("tei_active_aa");
+            set_active_integrals(tei_active_aa, tei_active_ab, tei_active_aa);
+        } else {
+            // if we are skipping the build, we need to build the active integrals from the
+            // jk integrals directly
+            auto [tei_active_ab, Fc, e_closed] = ints_->build_active_ints_from_jk(ints_->Ca());
+
+            auto tei_active_aa = tei_active_ab.clone();
+            tei_active_aa("pqrs") = tei_active_ab("pqrs") - tei_active_ab("pqsr");
+            tei_active_aa.set_name("tei_active_aa");
+            set_active_integrals(tei_active_aa, tei_active_ab, tei_active_aa);
+
+            auto& oei = Fc.data();
+            set_restricted_one_body_operator(oei, oei);
+            set_scalar_energy(e_closed - ints_->frozen_core_energy());
+        }
+
+    } else {
+        auto tei_active_aa =
+            ints_->aptei_aa_block(active_mo(), active_mo(), active_mo(), active_mo());
+        auto tei_active_ab =
+            ints_->aptei_ab_block(active_mo(), active_mo(), active_mo(), active_mo());
+        auto tei_active_bb =
+            ints_->aptei_bb_block(active_mo(), active_mo(), active_mo(), active_mo());
+        set_active_integrals(tei_active_aa, tei_active_ab, tei_active_bb);
+    }
+    if (not ints_->skip_build())
+        compute_restricted_one_body_operator();
+}
+
 std::shared_ptr<ActiveSpaceIntegrals>
 make_active_space_ints(std::shared_ptr<MOSpaceInfo> mo_space_info,
                        std::shared_ptr<ForteIntegrals> ints, const std::string& active_space,
@@ -558,20 +597,8 @@ make_active_space_ints(std::shared_ptr<MOSpaceInfo> mo_space_info,
     auto as_ints =
         std::make_shared<ActiveSpaceIntegrals>(ints, active_mo, active_mo_symmetry, core_mo);
 
-    // grab the integrals from the ForteIntegrals object
-    if (ints->spin_restriction() == IntegralSpinRestriction::Restricted) {
-        auto tei_active_ab = ints->aptei_ab_block(active_mo, active_mo, active_mo, active_mo);
-        auto tei_active_aa = tei_active_ab.clone();
-        tei_active_aa("pqrs") = tei_active_ab("pqrs") - tei_active_ab("pqsr");
-        tei_active_aa.set_name("tei_active_aa");
-        as_ints->set_active_integrals(tei_active_aa, tei_active_ab, tei_active_aa);
-    } else {
-        auto tei_active_aa = ints->aptei_aa_block(active_mo, active_mo, active_mo, active_mo);
-        auto tei_active_ab = ints->aptei_ab_block(active_mo, active_mo, active_mo, active_mo);
-        auto tei_active_bb = ints->aptei_bb_block(active_mo, active_mo, active_mo, active_mo);
-        as_ints->set_active_integrals(tei_active_aa, tei_active_ab, tei_active_bb);
-    }
-    as_ints->compute_restricted_one_body_operator();
+    as_ints->build_active_integrals_from_ints();
+
     return as_ints;
 }
 
