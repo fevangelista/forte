@@ -50,7 +50,7 @@ from forte.pymodule import prepare_forte_options, prepare_forte_objects
 
 options = prepare_forte_options()
 ref_wfn, state_weights_map, mo_space_info, scf_info, _ = forte_objects = prepare_forte_objects(options, 'FORTE', ref_wfn=wfn)
-ints = forte.make_ints_from_psi4(ref_wfn, options, mo_space_info)
+ints = forte.make_ints_from_psi4(ref_wfn, options, mo_space_info, 'DF', False)
 
 state_map = forte.to_state_nroots_map(state_weights_map)
 as_ints = forte.make_active_space_ints(mo_space_info, ints, "ACTIVE", ["RESTRICTED_DOCC"])

@@ -604,6 +604,8 @@ def run_forte(name, **kwargs):
 
         # create an active space solver object and compute the energy
         active_space_solver_type = options.get_str('ACTIVE_SPACE_SOLVER')
+        active_space_solver_type = 'FCI'
+        print("DEBUG: Change active space solver from FCI to the option value")
         as_ints = forte.make_active_space_ints(mo_space_info, ints, "ACTIVE", ["RESTRICTED_DOCC"])
         active_space_solver = forte.make_active_space_solver(
             active_space_solver_type, state_map, scf_info, mo_space_info, as_ints, options
@@ -731,7 +733,16 @@ def gradient_forte(name, **kwargs):
         casscf.compute_gradient()
 
     if job_type == "MCSCF_TWO_STEP":
-        casscf = forte.make_mcscf_two_step(state_weights_map, scf_info, options, mo_space_info, ints)
+        state_map = forte.to_state_nroots_map(state_weights_map)
+        active_space_solver_type = 'FCI'
+        print("DEBUG: Change active space solver from FCI to the option value")
+        as_ints = forte.make_active_space_ints(mo_space_info, ints, "ACTIVE", ["RESTRICTED_DOCC"])
+        active_space_solver = forte.make_active_space_solver(
+            active_space_solver_type, state_map, scf_info, mo_space_info, as_ints, options
+        )
+        active_space_solver.compute_energy()
+        casscf = forte.make_mcscf_two_step(active_space_solver,state_weights_map, scf_info, options, mo_space_info, ints)
+        # casscf = forte.make_mcscf_two_step(state_weights_map, scf_info, options, mo_space_info, ints)
         energy = casscf.compute_energy()
 
     if job_type == 'NEWDRIVER' and correlation_solver == 'DSRG-MRPT2':

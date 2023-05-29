@@ -239,7 +239,7 @@ def prepare_forte_objects(
     state_weights_map = forte.make_state_weights_map(options, mo_space_info)
 
     # make a ForteIntegral object
-    ints = forte.make_ints_from_psi4(wfn, options, mo_space_info)
+    ints = forte.make_ints_from_psi4(wfn, options, mo_space_info,options.get_str('INT_TYPE'),skip_build=False)
 
     if localize:
         localizer = forte.Localize(forte.forte_options, ints, mo_space_info)
