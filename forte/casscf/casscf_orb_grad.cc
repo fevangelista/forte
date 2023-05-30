@@ -124,14 +124,15 @@ void CASSCF_ORB_GRAD::setup_mos() {
     label_to_cmos_["a"] = mo_space_info_->corr_absolute_mo("ACTIVE");
     label_to_cmos_["v"] = mo_space_info_->corr_absolute_mo("RESTRICTED_UOCC");
 
-    // in Pitzer ordering
-    mos_rel_.resize(nmo_);
-    for (int h = 0, offset = 0; h < nirrep_; ++h) {
-        for (int i = 0; i < nmopi_[h]; ++i) {
-            mos_rel_[i + offset] = std::make_pair(h, i);
-        }
-        offset += nmopi_[h];
-    }
+    mos_rel_ = mos_rel_ = mo_space_info_->relative_mo("ALL");
+    // // in Pitzer ordering
+    // mos_rel_.resize(nmo_);
+    // for (int h = 0, offset = 0; h < nirrep_; ++h) {
+    //     for (int i = 0; i < nmopi_[h]; ++i) {
+    //         mos_rel_[i + offset] = std::make_pair(h, i);
+    //     }
+    //     offset += nmopi_[h];
+    // }
 
     // in Pitzer ordering
     mos_rel_space_.resize(nmo_);

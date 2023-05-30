@@ -166,7 +166,7 @@ class CASSCF_ORB_GRAD {
     std::map<std::string, std::vector<size_t>> label_to_cmos_;
 
     /// Relative indices within an irrep <irrep, relative indices>
-    std::vector<std::pair<int, size_t>> mos_rel_;
+    std::vector<std::pair<size_t, size_t>> mos_rel_;
 
     /// Relative indices within an MO space <space, relative indices>
     std::vector<std::pair<std::string, size_t>> mos_rel_space_;
