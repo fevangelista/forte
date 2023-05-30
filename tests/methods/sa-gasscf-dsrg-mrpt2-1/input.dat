@@ -35,7 +35,7 @@ set forte {
   GAS1MIN [0,0]
   AVG_STATE [[0,1,1],[2,1,1]]
   job_type mcscf_two_step
-  casscf_ci_solver detci
+  active_space_solver detci
   casscf_maxiter 100
   casscf_e_convergence 1e-10
   casscf_g_convergence 1e-8

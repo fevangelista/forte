@@ -645,21 +645,29 @@ void CASSCF_ORB_GRAD::build_fock_active() {
     }
 }
 
-void CASSCF_ORB_GRAD::format_fock(std::shared_ptr<psi::Matrix> Fock, ambit::BlockedTensor F) {
-    F.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
-        auto irrep_index_pair1 = mos_rel_[i[0]];
-        auto irrep_index_pair2 = mos_rel_[i[1]];
+void CASSCF_ORB_GRAD::format_fock(std::shared_ptr<psi::Matrix> Fmat, ambit::BlockedTensor Ften) {
+    auto actv_relative_mos = mo_space_info_->relative_mo("ALL");
 
-        int h1 = irrep_index_pair1.first;
-
-        if (h1 == irrep_index_pair2.first) {
-            auto p = irrep_index_pair1.second;
-            auto q = irrep_index_pair2.second;
-            value = Fock->get(h1, p, q);
-        } else {
-            value = 0.0;
-        }
+    Ften.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
+        const auto& [h1, p] = actv_relative_mos[i[0]];
+        const auto& [h2, q] = actv_relative_mos[i[1]];
+        value = (h1 == h2) ? Fmat->get(h1, p, q) : 0.0;
     });
+
+    // F.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
+    //     auto irrep_index_pair1 = mos_rel_[i[0]];
+    //     auto irrep_index_pair2 = mos_rel_[i[1]];
+
+    //     int h1 = irrep_index_pair1.first;
+
+    //     if (h1 == irrep_index_pair2.first) {
+    //         auto p = irrep_index_pair1.second;
+    //         auto q = irrep_index_pair2.second;
+    //         value = Fock->get(h1, p, q);
+    //     } else {
+    //         value = 0.0;
+    //     }
+    // });
 }
 
 std::shared_ptr<psi::Matrix> CASSCF_ORB_GRAD::fock(std::shared_ptr<RDMs> rdms) {

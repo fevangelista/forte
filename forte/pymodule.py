@@ -603,8 +603,7 @@ def run_forte(name, **kwargs):
         state_map = forte.to_state_nroots_map(state_weights_map)
 
         # create an active space solver object and compute the energy
-        active_space_solver_type = options.get_str('ACTIVE_SPACE_SOLVER')
-        active_space_solver_type = 'FCI'
+        active_space_solver_type = options.get_str('ACTIVE_SPACE_SOLVER') or 'FCI'
         print("DEBUG: Change active space solver from FCI to the option value")
         as_ints = forte.make_active_space_ints(mo_space_info, ints, "ACTIVE", ["RESTRICTED_DOCC"])
         active_space_solver = forte.make_active_space_solver(
@@ -734,7 +733,7 @@ def gradient_forte(name, **kwargs):
 
     if job_type == "MCSCF_TWO_STEP":
         state_map = forte.to_state_nroots_map(state_weights_map)
-        active_space_solver_type = 'FCI'
+        active_space_solver_type = options.get_str('ACTIVE_SPACE_SOLVER') or 'FCI'
         print("DEBUG: Change active space solver from FCI to the option value")
         as_ints = forte.make_active_space_ints(mo_space_info, ints, "ACTIVE", ["RESTRICTED_DOCC"])
         active_space_solver = forte.make_active_space_solver(

@@ -76,7 +76,7 @@ class CustomIntegrals : public ForteIntegrals {
     /// Make the generalized Fock matrix
     void make_fock_matrix(ambit::Tensor Da, ambit::Tensor Db) override;
 
-    /// Make the closed-shell Fock matrix
+    /// Make the closed-shell Fock matrix in MO basis (include frozen orbitals)
     std::tuple<std::shared_ptr<psi::Matrix>, std::shared_ptr<psi::Matrix>, double>
     make_fock_inactive(psi::Dimension dim_start, psi::Dimension dim_end) override;
 
