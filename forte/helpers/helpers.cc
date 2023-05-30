@@ -113,6 +113,28 @@ std::shared_ptr<psi::Matrix> tensor_to_matrix(ambit::Tensor t, psi::Dimension di
     return M_sym;
 }
 
+void copy_matrix_to_block_tensor(std::shared_ptr<psi::Matrix> m, ambit::BlockedTensor t,
+                                 const std::vector<std::pair<size_t, size_t>>& relative_mo) {
+    t.iterate(
+        [&](const std::vector<size_t>& i, const std::vector<ambit::SpinType>&, double& value) {
+            const auto& [h1, p] = relative_mo[i[0]];
+            const auto& [h2, q] = relative_mo[i[1]];
+            value = (h1 == h2) ? m->get(h1, p, q) : 0.0;
+        });
+}
+
+void copy_block_tensor_to_matrix(ambit::BlockedTensor t, std::shared_ptr<psi::Matrix> m,
+                                 const std::vector<std::pair<size_t, size_t>>& relative_mo) {
+    t.citerate([&](const std::vector<size_t>& i, const std::vector<ambit::SpinType>&,
+                   const double& value) {
+        const auto& [h1, p] = relative_mo[i[0]];
+        const auto& [h2, q] = relative_mo[i[1]];
+        if (h1 == h2) {
+            m->set(h1, p, q, value);
+        }
+    });
+}
+
 std::pair<double, std::string> to_xb(size_t nele, size_t type_size) {
     if (nele == 0)
         return {0.0, "B"};

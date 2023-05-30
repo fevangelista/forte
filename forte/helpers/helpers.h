@@ -91,6 +91,20 @@ std::shared_ptr<psi::Matrix> tensor_to_matrix(ambit::Tensor t);
  */
 std::shared_ptr<psi::Matrix> tensor_to_matrix(ambit::Tensor t, psi::Dimension dims);
 
+/// @brief Convert a psi::Matrix to an ambit blocked tensor
+/// @param m The input matrix
+/// @param t The output tensor
+/// @param relative_mo The relative MO indices to copy
+void copy_matrix_to_block_tensor(std::shared_ptr<psi::Matrix> m, ambit::BlockedTensor t,
+                                 const std::vector<std::pair<size_t, size_t>>& relative_mo);
+
+/// @brief Convert an ambit blocked tensor to a psi::Matrix
+/// @param t The input tensor
+/// @param m The output matrix
+/// @param relative_mo The relative MO indices to copy
+void copy_block_tensor_to_matrix(ambit::BlockedTensor t, std::shared_ptr<psi::Matrix> m,
+                                 const std::vector<std::pair<size_t, size_t>>& relative_mo);
+
 // /**
 //  * @brief view_modified_orbitals Write orbitals using molden
 //  * @param Ca  The Ca matrix to be viewed with MOLDEN

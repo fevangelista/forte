@@ -344,14 +344,8 @@ class CASSCF_ORB_GRAD {
 
     // => Some helper functions <=
 
-    /// Format the Fock matrix from SharedMatrix to BlockedTensor
-    void format_fock(std::shared_ptr<psi::Matrix> Fock, ambit::BlockedTensor F);
-
     /// Format the 1RDM from BlockedTensor to SharedMatrix
     void format_1rdm();
-
-    /// Fill Am_ matrix from BlockedTensor A
-    void fill_A_matrix_data(ambit::BlockedTensor A);
 
     /// Reshape the orbital rotation related BlockedTensor to std::shared_ptr<psi::Vector>
     void reshape_rot_ambit(ambit::BlockedTensor bt, const std::shared_ptr<psi::Vector>& sv);

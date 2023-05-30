@@ -591,7 +591,7 @@ void CASSCF_ORB_GRAD::build_fock(bool rebuild_inactive) {
     Fock_->add(F_closed_);
     Fock_->set_name("Fock_MO");
 
-    format_fock(Fock_, F_);
+    copy_matrix_to_block_tensor(Fock_, F_, mos_rel_);
 
     // fill in diagonal Fock in Pitzer ordering
     for (const std::string& space : {"c", "a", "v"}) {
@@ -623,8 +623,8 @@ void CASSCF_ORB_GRAD::build_fock_inactive() {
     std::tie(F_closed_, std::ignore, e_closed_) = Ftuple;
     F_closed_->set_name("Fock_inactive");
 
-    // put into Ambit BlockedTensor format
-    format_fock(F_closed_, Fc_);
+    // // put into Ambit BlockedTensor format
+    copy_matrix_to_block_tensor(F_closed_, Fc_, mos_rel_);
 
     if (debug_print_) {
         F_closed_->print();
@@ -644,31 +644,6 @@ void CASSCF_ORB_GRAD::build_fock_active() {
     if (debug_print_) {
         Fock_->print();
     }
-}
-
-void CASSCF_ORB_GRAD::format_fock(std::shared_ptr<psi::Matrix> Fmat, ambit::BlockedTensor Ften) {
-    auto actv_relative_mos = mo_space_info_->relative_mo("ALL");
-
-    Ften.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
-        const auto& [h1, p] = actv_relative_mos[i[0]];
-        const auto& [h2, q] = actv_relative_mos[i[1]];
-        value = (h1 == h2) ? Fmat->get(h1, p, q) : 0.0;
-    });
-
-    // F.iterate([&](const std::vector<size_t>& i, const std::vector<SpinType>&, double& value) {
-    //     auto irrep_index_pair1 = mos_rel_[i[0]];
-    //     auto irrep_index_pair2 = mos_rel_[i[1]];
-
-    //     int h1 = irrep_index_pair1.first;
-
-    //     if (h1 == irrep_index_pair2.first) {
-    //         auto p = irrep_index_pair1.second;
-    //         auto q = irrep_index_pair2.second;
-    //         value = Fock->get(h1, p, q);
-    //     } else {
-    //         value = 0.0;
-    //     }
-    // });
 }
 
 std::shared_ptr<psi::Matrix> CASSCF_ORB_GRAD::fock(std::shared_ptr<RDMs> rdms) {

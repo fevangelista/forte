@@ -31,6 +31,7 @@
 #include "psi4/libpsi4util/PsiOutStream.h"
 #include "psi4/psifiles.h"
 
+#include "helpers/helpers.h"
 #include "helpers/printing.h"
 #include "helpers/lbfgs/lbfgs.h"
 
@@ -48,7 +49,7 @@ void CASSCF_ORB_GRAD::compute_nuclear_gradient() {
 
     // format A to SharedMatrix
     Am_ = std::make_shared<psi::Matrix>("A (MCSCF)", nmopi_, nmopi_);
-    fill_A_matrix_data(A_);
+    copy_block_tensor_to_matrix(A_, Am_, mos_rel_);
 
     is_frozen_orbs_ = nfrzc_ or mo_space_info_->size("FROZEN_UOCC");
 
@@ -131,22 +132,6 @@ std::shared_ptr<psi::Matrix> CASSCF_ORB_GRAD::C_subset(const std::string& name,
     return Csub;
 }
 
-void CASSCF_ORB_GRAD::fill_A_matrix_data(ambit::BlockedTensor A) {
-    A.citerate(
-        [&](const std::vector<size_t>& i, const std::vector<SpinType>&, const double& value) {
-            auto irrep_index_pair1 = mos_rel_[i[0]];
-            auto irrep_index_pair2 = mos_rel_[i[1]];
-
-            int h1 = irrep_index_pair1.first;
-
-            if (h1 == irrep_index_pair2.first) {
-                auto p = irrep_index_pair1.second;
-                auto q = irrep_index_pair2.second;
-                Am_->set(h1, p, q, value);
-            }
-        });
-}
-
 void CASSCF_ORB_GRAD::setup_grad_frozen() {
     // terminate for high spin because ROHF CP-SCF is not implemented
     if (ints_->wfn()->soccpi().sum())
@@ -222,7 +207,7 @@ void CASSCF_ORB_GRAD::build_Am_frozen() {
     At["Mu"] = Fc_["Mt"] * D1_["tu"];
     At["Mu"] += V_["Mtvw"] * D2_["tuvw"];
 
-    fill_A_matrix_data(At);
+    copy_block_tensor_to_matrix(At, Am_, mos_rel_);
 }
 
 void CASSCF_ORB_GRAD::solve_cpscf() {
